@@ -60,7 +60,7 @@ pub fn multi_producer(n_producers: usize) -> Vec<String> {
     };
     result.sort();
     for handler in handlers{
-        handler.join().unwrap();
+
     }
     result
 }
