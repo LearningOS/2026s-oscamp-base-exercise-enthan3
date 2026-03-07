@@ -31,7 +31,7 @@
 //! Each function includes a `TODO` comment indicating where you need to write code.
 //! Run `cargo test` to check your implementations.
 
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::process::{Command, Stdio};
 
 /// Execute the given shell command and return its stdout output.
@@ -53,7 +53,11 @@ pub fn run_command(program: &str, args: &[&str]) -> String {
     // TODO: Set stdout to Stdio::piped()
     // TODO: Execute with .output() and get output
     // TODO: Convert stdout to String and return
-    todo!()
+    let mut command=Command::new(program);
+    command.args(args).stdout(Stdio::piped());
+    let out=command.output().unwrap();
+    let out_string=String::from_utf8(out.stdout).unwrap();
+    out_string
 }
 
 /// Write data to child process (cat) stdin via pipe and read its stdout output.
@@ -89,7 +93,22 @@ pub fn pipe_through_cat(input: &str) -> String {
     // TODO: Write input to child process stdin
     // TODO: Drop stdin to close pipe (otherwise cat won't exit)
     // TODO: Read output from child process stdout
-    todo!()
+    let mut command=Command::new("cat");
+    command.stdin(Stdio::piped()).stdout(Stdio::piped());
+    let mut child=command.spawn().unwrap();
+    {
+        let mut stdin = child.stdin.take().unwrap();
+        stdin.write_all(input.as_bytes()).unwrap();
+        drop(stdin);
+    }
+    let mut output=String::new();
+    {
+        let mut stdout=child.stdout.take().unwrap();
+        stdout.read_to_string(&mut output).unwrap();
+    }
+    child.wait().unwrap();
+    output
+
 }
 
 /// Get child process exit code.
@@ -107,10 +126,20 @@ pub fn pipe_through_cat(input: &str) -> String {
 /// 3. Use `.code()` to get the exit code as `Option<i32>`.
 /// 4. If the child terminated normally, return the exit code; otherwise return a default.
 pub fn get_exit_code(command: &str) -> i32 {
-    // TODO: Use Command::new("sh").args(["-c", command])
-    // TODO: Execute and get status
-    // TODO: Return exit code
-    todo!()
+    let mut sh=Command::new("sh");
+    sh.args(["-c",command]);
+    let R=sh.status();
+    match R{
+        Ok(status)=>{
+            match status.code(){
+                Some(code)=> code,
+                None=>-1,
+            }
+        }
+        Err(e)=>{
+            -1
+        }
+    }
 }
 
 /// Execute the given shell command and return its stdout output as a `Result`.
@@ -137,7 +166,25 @@ pub fn run_command_with_result(program: &str, args: &[&str]) -> io::Result<Strin
     // TODO: Set stdout to Stdio::piped()
     // TODO: Execute with .output() and handle Result
     // TODO: Convert stdout to String with from_utf8, mapping errors to io::Error
-    todo!()
+    let mut p=Command::new(program);
+    p.stdout(Stdio::piped()).args(args);
+    let r=p.output();
+    match r{
+        Ok(o)=>{
+            let r2=String::from_utf8(o.stdout);
+            match r2{
+                Ok(s)=>{
+                    Ok(s)
+                }
+                Err(e)=>{
+                    Err(io::Error::new(std::io::ErrorKind::InvalidData,e))
+                }
+            }
+        }
+        Err(e)=>{
+            Err(e)
+        }
+    }
 }
 
 /// Interact with `grep` via bidirectional pipes, filtering lines that contain a pattern.
@@ -167,7 +214,28 @@ pub fn pipe_through_grep(pattern: &str, input: &str) -> String {
     // TODO: Drop stdin to close pipe
     // TODO: Read output from child stdout line by line
     // TODO: Collect and return matching lines
-    todo!()
+    let mut grep_command=Command::new("grep");
+    grep_command.stdin(Stdio::piped()).stdout(Stdio::piped());
+    grep_command.arg(pattern);
+    let mut child=grep_command.spawn().unwrap();
+    {
+        let mut child_stdin=child.stdin.take().unwrap();
+        child_stdin.write_all(input.as_bytes()).unwrap();
+        drop(child_stdin);
+    }
+    let mut s=String::new();
+    {
+        let mut child_stdout=child.stdout.take().unwrap();
+        let ls=BufReader::new(child_stdout).lines();
+        for line_res in ls{
+            let line=line_res.unwrap();
+            s.push_str(&line);
+            s.push_str("\n");
+    }
+    }
+    child.wait().unwrap();
+    s
+
 }
 
 #[cfg(test)]
