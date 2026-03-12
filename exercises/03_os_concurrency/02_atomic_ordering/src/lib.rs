@@ -89,22 +89,26 @@ impl OnceCell {
     pub fn init(&self, val: u32) -> bool {
         // TODO: Use compare_exchange to ensure initialization only once
         // Store value on success
-        let status=self.initialized.compare_exchange(false,true,Ordering::SeqCst,Ordering::Relaxed);
-        match status{
-            Ok(_)=>{
-                self.value.store(val,Ordering::SeqCst);
+        match self.initialized.compare_exchange(
+            false,
+            true,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(_) => {
+                self.value.store(val, Ordering::SeqCst);
                 true
             }
-            Err(_)=>false,
+            Err(_) => false,
         }
     }
 
     /// Get value. Returns Some if initialized, otherwise None.
     pub fn get(&self) -> Option<u32> {
         // TODO: Check initialized flag, then read value
-        if self.initialized.load(Ordering::SeqCst){
+        if self.initialized.load(Ordering::SeqCst) {
             Some(self.value.load(Ordering::SeqCst))
-        }else{
+        } else {
             None
         }
     }
